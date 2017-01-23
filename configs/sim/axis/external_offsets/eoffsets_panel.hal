@@ -1,0 +1,10 @@
+net e:trespass pyvcp.trespass
+
+net e:panelx axis.x.eoffset pyvcp.x-offset-f
+net e:panely axis.y.eoffset pyvcp.y-offset-f
+net e:panelz axis.z.eoffset pyvcp.z-offset-f
+
+# existing signals:
+net J0:pos-cmd joint.0.motor-pos-cmd pyvcp.motor.0-f
+net J1:pos-cmd joint.1.motor-pos-cmd pyvcp.motor.1-f
+net J2:pos-cmd joint.2.motor-pos-cmd pyvcp.motor.2-f

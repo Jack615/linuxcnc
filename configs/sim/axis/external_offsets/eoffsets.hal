@@ -1,0 +1,34 @@
+#---------------------------------------------------------------
+# external offset input control pins:
+setp axis.x.eoffset-enable 1
+setp axis.y.eoffset-enable 1
+setp axis.z.eoffset-enable 1
+
+setp axis.x.eoffset-scale 0.1
+setp axis.y.eoffset-scale 0.1
+setp axis.z.eoffset-scale 0.1
+
+#---------------------------------------------------------------
+# convenience signals for use with eoffsets_monitor.tcl:
+net e:xcounts axis.x.eoffset-counts
+net e:ycounts axis.y.eoffset-counts
+net e:zcounts axis.z.eoffset-counts
+
+#---------------------------------------------------------------
+# Example hal logic to respond to motion.set-trespass and:
+#   1) program stop
+#   2) machine off
+# These actions are disabled by e:override_limit_stop
+
+loadrt oneshot     names=oshot
+loadrt message     names=limitmsg messages="STOP_on_SoftLimit"
+addf   oshot       servo-thread
+addf   limitmsg    servo-thread
+setp   oshot.width 0.1
+
+# note: the signal 'e:trespass' is also used in eoffsets_panel.hal
+net  e:trespass motion.eoffset-trespass => oshot.in
+net  e:halt     oshot.out  => halui.program.stop
+net  e:halt                => limitmsg.trigger
+net  e:halt                => halui.machine.off
+net  e:override_limit_stop => oshot.reset

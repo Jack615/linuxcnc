@@ -1,0 +1,85 @@
+= External axis offsets
+
+Hal pins are provided to change axis positions by
+external offsets.  External offsets will be applied
+for teleop (world) jogs and coordinated (gcode)
+motion.  All joints must be homed before external
+offsets are honored.
+
+== Ini file Settings
+
+For each axis letter (*L* in xyzabcuvw):
+
+----
+[AXIS_L]OFFSET_AV_RATIO = value
+----
+
+. Allowed values: 0 <= value <= 0.9
+. Disallowed values are replaced with 0.1 with message to stdout
+. Default value:  0 (disables external offset).
+  Consequence: omitted [AXIS_L]OFFSET_AV_RATIO disables external offset for the axis.
+. If nonzero, the  OFFSET_AV_RATIO (*r*), adjusts the normal max vel to preserve [AXIS_L] constraints:
+    
+  normal max vel        = (1-r) * MAX_VELOCITY
+  external offset vel   = (  r) * MAX_VELOCITY
+    
+  normal max accel      = (1-r) * MAX_ACCELERATIOIN
+  external offset accel = (  r) * MAX_ACCELERATION
+
+== Axis Hal Pins
+
+For each  axis letter (L in xyzabcuvw)
+
+. *axis.L.eoffset-enable* Input: enable (bit)
+. *axis.L.eoffset-scale*  Input: scale factor (float)
+. *axis.L.eoffset-counts* Input: to counter/accumlator (s32)
+. *axis.L.eoffset*        Output:current external offset (float)
+    
+== Motion Hal Pins
+
+. *motion.eoffset-trespass* Output: soft limit trespass (bit)
+    
+== Soft Limits
+    
+An axis soft limit may be exceeded when external offsets are
+applied. The hal output pin: 'motion.eoffset-trespass'
+is asserted when the net motion augmented by external
+offsets violates one or more axis soft limits.
+    
+The 'motion.eoffset-trespass' pin may be used with additional
+hal logic to limit the value of offending external offset(s).
+Such logic should 1) detect assertion of 'motion.eoffset-trespass'
+and 2) pulse halui.program.stop and halui.machine.off to
+stop a running program and halt the machine.  The logic
+must also provide a way to override its stopping action
+in order to allow a restart since the offending soft limit
+condition(s) will typically remain in effect after machine.off.
+
+== Machine-off/Machine-on
+
+When the machine is turned off (machine.off or estop), the
+*current position with external offsets is maintained*
+so that there is no unexpected motion.
+At each startup (machine.on), the internal accumulator for
+the each hal pin 'axis.L.eoffset-counts' is zeroed  and the
+corresponding hal output pin 'axis.L.eoffset' is reset to zero.
+
+In other words, external offsets are *defined as zero at
+each startup* (machine.on) regardless of the value of
+the 'axis.L.eoffset-counts' pins.  To avoid confusion, it is
+recommended that all 'axis.L.eoffset-counts' pins are set to
+zero when the machine is off.
+
+== Examples
+    
+Examples to demonstrate usage are provided in
+'sim/configs/axis/external_offsets':
+
+----
+eoffsets_demo.ini -- demo using axis gui (see the README)
+  Note: By default, e:override_limit_stop is False and
+        trespass of soft limits will stop machine.
+        Use e:override_limit_stop to allow a restart
+        and move off the offending soft limit.
+----
+    
