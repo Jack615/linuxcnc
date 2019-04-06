@@ -14,12 +14,13 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with this program; if not, write to the Free Software
- *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 // Interpreter internals - Python bindings
 // Michael Haberler 7/2011
 //
 
+#define BOOST_PYTHON_MAX_ARITY 4
 #include <boost/python/class.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/exception_translator.hpp>
@@ -81,14 +82,13 @@ static  sub_context_array sub_context_wrapper ( Interp & inst) {
 }
 
 
-#pragma GCC diagnostic ignored "-Wformat-security"
 static void setErrorMsg(Interp &interp, const char *s)
 {
     setup *settings  = &interp._setup;
 
     if ((s == NULL) || (strlen(s) == 0))
 	s = "###";
-    interp.setError (s);
+    interp.setError ("%s", s);
     settings->stack_index = 0;
     strncpy(settings->stack[settings->stack_index],
 	    "Python", STACK_ENTRY_LEN);
@@ -96,8 +96,6 @@ static void setErrorMsg(Interp &interp, const char *s)
     settings->stack_index++;
     settings->stack[settings->stack_index][0] = 0;
 }
-
-#pragma GCC diagnostic warning "-Wformat-security"
 
 static bp::object errorStack(Interp &interp)
 {
@@ -298,8 +296,8 @@ static inline void set_probe_flag(Interp &interp, bool value)  {
 static inline bool get_speed_override (Interp &interp)  {
     return interp._setup.speed_override;
 }
-static inline void set_speed_override(Interp &interp, bool value)  {
-    interp._setup.speed_override = value;
+static inline void set_speed_override(Interp &interp, int spindle, bool value)  {
+    interp._setup.speed_override[spindle] = value;
 }
 static inline bool get_toolchange_flag (Interp &interp)  {
     return interp._setup.toolchange_flag;
@@ -511,11 +509,11 @@ static inline double get_rotation_xy (Interp &interp)  {
 static inline void set_rotation_xy(Interp &interp, double value)  {
     interp._setup.rotation_xy = value;
 }
-static inline double get_speed (Interp &interp)  {
-    return interp._setup.speed;
+static inline double get_speed (Interp &interp, int spindle)  {
+    return interp._setup.speed[spindle];
 }
-static inline void set_speed(Interp &interp, double value)  {
-    interp._setup.speed = value;
+static inline void set_speed(Interp &interp, int spindle, double value)  {
+    interp._setup.speed[spindle] = value;
 }
 static inline double get_traverse_rate (Interp &interp)  {
     return interp._setup.traverse_rate;
@@ -751,17 +749,17 @@ static inline int get_speed_feed_mode (Interp &interp)  {
 static inline void set_speed_feed_mode(Interp &interp, int value)  {
     interp._setup.speed_feed_mode = value;
 }
-static inline int get_spindle_mode (Interp &interp)  {
-    return interp._setup.spindle_mode;
+static inline int get_spindle_mode (Interp &interp, int spindle)  {
+    return interp._setup.spindle_mode[spindle];
 }
-static inline void set_spindle_mode(Interp &interp, SPINDLE_MODE value)  {
-    interp._setup.spindle_mode = value;
+static inline void set_spindle_mode(Interp &interp, int spindle, SPINDLE_MODE value)  {
+    interp._setup.spindle_mode[spindle] = value;
 }
-static inline int get_spindle_turning (Interp &interp)  {
-    return interp._setup.spindle_turning;
+static inline int get_spindle_turning (Interp &interp, int spindle)  {
+    return interp._setup.spindle_turning[spindle];
 }
-static inline void set_spindle_turning(Interp &interp, int value)  {
-    interp._setup.spindle_turning = value;
+static inline void set_spindle_turning(Interp &interp, int spindle, int value)  {
+    interp._setup.spindle_turning[spindle] = value;
 }
 static inline int get_stack_index (Interp &interp)  {
     return interp._setup.stack_index;

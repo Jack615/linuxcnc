@@ -20,13 +20,15 @@
 #
 #    You should have received a copy of the GNU General Public License
 #    along with this program; if not, write to the Free Software
-#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 #import pygtk
 #pygtk.require("2.0")
 
 #import gtk
 #import gtk.glade
+import gi
+gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 #import gobject
 from gi.repository import GObject
@@ -46,6 +48,8 @@ import hal
 import shutil
 import time
 from multifilebuilder_gtk3 import MultiFileBuilder
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 import traceback
 # otherwise, on hardy the user is shown spurious "[application] closed
@@ -728,6 +732,7 @@ class StepconfApp:
         self.d = Data(self._p)
         # build the glade files
         self.builder = MultiFileBuilder()
+        self.builder.set_translation_domain(domain)
         self.builder.add_from_file(os.path.join(datadir,'main_page.glade'))
         window = self.builder.get_object("window1")
         notebook1 = self.builder.get_object("notebook1")

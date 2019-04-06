@@ -84,8 +84,8 @@ set menubar [menu $top.menubar -tearoff 0]
 set filemenu [menu $menubar.file -tearoff 1]
     $menubar add cascade -label [msgcat::mc "File"] \
             -menu $filemenu
-        set ::savelabel1 "Save Watch List" ;# identifier for entryconfigure
-        set ::savelabel2 "Save Watch List (multiline)" ;# identifier for entryconfigure
+        set ::savelabel1 [msgcat::mc "Save Watch List"] ;# identifier for entryconfigure
+        set ::savelabel2 [msgcat::mc "Save Watch List (multiline)"] ;# identifier for entryconfigure
         $filemenu add command -label [msgcat::mc $::savelabel1] \
             -command savewatchlist
         $filemenu add command -label [msgcat::mc $::savelabel2] \
@@ -435,15 +435,27 @@ proc watchLoop {} {
         scan $var {%i %s %s} cnum vartype varname
         if {$vartype == "sig" } {
             set ret [hal gets $varname]
+            set varnumtype [hal stype $varname]
         } else {
             set ret [hal getp $varname]
+            set varnumtype [hal ptype $varname]
         }
         if {$ret == "TRUE"} {
             $::cisp itemconfigure oval$cnum -fill yellow
         } elseif {$ret == "FALSE"} {
             $::cisp itemconfigure oval$cnum -fill firebrick4
         } else {
-            set value [expr $ret]
+            switch $varnumtype {
+              u32 - s32  {set varnumtype int}
+              float      {set varnumtype float}
+            }
+            set value [expr $ret] ;# supersede if format provided
+            if {[info exists ::ffmt] && ("$varnumtype" == "float")} {
+               set value [format "$::ffmt" $ret]
+            }
+            if {[info exists ::ifmt] && ("$varnumtype" == "int")} {
+               set value [format "$::ifmt" $ret]
+            }
             $::cisp itemconfigure text$cnum -text $value
         }
     }
@@ -555,12 +567,13 @@ proc usage {} {
   puts "Usage:"
   puts "  $prog \[Options\] \[watchfile\]"
   puts "  Options:"
-  puts "           --help  (this help)"
+  puts "           --help    (this help)"
+  puts "           --fformat format_string_for_float"
+  puts "           --iformat format_string_for_int"
   puts ""
   puts "Notes:"
   puts "       Create watchfile in halshow using: 'File/Save Watch List'"
   puts "       linuxcnc must be running for standalone usage"
-  #puts "     -ini inifilename (not currently used)"
   exit 0
 }
 
@@ -568,7 +581,15 @@ if {[llength $::argv] > 0} {
   set idx 0
   while {$idx < [llength $::argv]} {
      switch [lindex $::argv $idx] {
-       "--help" {incr idx; usage}
+       "--help"    {incr idx; usage}
+       "--iformat" {incr idx;
+                    set ::ifmt [lindex $::argv $idx]
+                    incr idx
+                   }
+       "--fformat" {incr idx;
+                    set ::ffmt [lindex $::argv $idx]
+                    incr idx
+                   }
        default { set watchfile [lindex $::argv $idx]
                  if [file readable $watchfile] {
                     loadwatchlist $watchfile

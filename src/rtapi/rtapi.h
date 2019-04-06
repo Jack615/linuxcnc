@@ -44,7 +44,7 @@
 
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111 USA
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     THE AUTHORS OF THIS LIBRARY ACCEPT ABSOLUTELY NO LIABILITY FOR
     ANY HARM OR LOSS RESULTING FROM ITS USE.  IT IS _EXTREMELY_ UNWISE
@@ -763,17 +763,19 @@ RTAPI_BEGIN_DECLS
   MODULE_PARM(var,"s");            \
   MODULE_PARM_DESC(var,descr);
 
-#define RTAPI_MP_ARRAY_INT(var,num,descr)          \
-  MODULE_PARM(var,"1-" RTAPI_STRINGIFY(num) "i");  \
+#define RTAPI_MP_ARRAY(type, var, num, descr)      \
+  MODULE_PARM(var,type);                           \
+  MODULE_INFO2(int, size, var, num);               \
   MODULE_PARM_DESC(var,descr);
+
+#define RTAPI_MP_ARRAY_INT(var,num,descr)          \
+  RTAPI_MP_ARRAY("i", var, num, descr);
 
 #define RTAPI_MP_ARRAY_LONG(var,num,descr)         \
-  MODULE_PARM(var,"1-" RTAPI_STRINGIFY(num) "l");  \
-  MODULE_PARM_DESC(var,descr);
+  RTAPI_MP_ARRAY("l", var, num, descr);
 
 #define RTAPI_MP_ARRAY_STRING(var,num,descr)       \
-  MODULE_PARM(var,"1-" RTAPI_STRINGIFY(num) "s");  \
-  MODULE_PARM_DESC(var,descr);
+  RTAPI_MP_ARRAY("s", var, num, descr);
 
 #else /* kernel */
 
@@ -824,8 +826,6 @@ int rtapi_spawnp_as_root(pid_t *pid, const char *path,
     const posix_spawn_file_actions_t *file_actions,
     const posix_spawnattr_t *attrp,
     char *const argv[], char *const envp[]);
-
-int rtapi_do_as_root(int (*fn)(void *), void *arg);
 #endif
 
 extern int rtapi_is_kernelspace(void);

@@ -14,7 +14,7 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with this program; if not, write to the Free Software
- *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #include "python_plugin.hh"
 #include "inifile.hh"
@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define BOOST_PYTHON_MAX_ARITY 4
 #include <boost/python/exec.hpp>
 #include <boost/python/extract.hpp>
 #include <boost/python/import.hpp>
@@ -376,8 +377,8 @@ int PythonPlugin::configure(const char *iniFilename,
 	logPP(1, "%s:%d: executing '%s'",iniFilename, lineno, pycmd);
 
 	if (PyRun_SimpleString(pycmd)) {
-	    logPP(-1, "%s:%d: exeception running '%s'",iniFilename, lineno, pycmd);
-	    exception_msg = "exeception running:" + std::string((const char*)pycmd);
+	    logPP(-1, "%s:%d: exception running '%s'",iniFilename, lineno, pycmd);
+	    exception_msg = "exception running:" + std::string((const char*)pycmd);
 	    status = PLUGIN_EXCEPTION_DURING_PATH_PREPEND;
 	    return status;
 	}
@@ -389,8 +390,8 @@ int PythonPlugin::configure(const char *iniFilename,
 	sprintf(pycmd, "import sys\nsys.path.append(\"%s\")", inistring);
 	logPP(1, "%s:%d: executing '%s'",iniFilename, lineno, pycmd);
 	if (PyRun_SimpleString(pycmd)) {
-	    logPP(-1, "%s:%d: exeception running '%s'",iniFilename, lineno, pycmd);
-	    exception_msg = "exeception running " + std::string((const char*)pycmd);
+	    logPP(-1, "%s:%d: exception running '%s'",iniFilename, lineno, pycmd);
+	    exception_msg = "exception running " + std::string((const char*)pycmd);
 	    status = PLUGIN_EXCEPTION_DURING_PATH_APPEND;
 	    return status;
 	}

@@ -71,7 +71,7 @@ source [file join $::env(HALLIB_DIR) util_lib.tcl]
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #-----------------------------------------------------------------------
 
 proc is_uniq {list_name} {
@@ -124,6 +124,9 @@ proc connect_pins {} {
 } ;# connect_pins
 
 proc wheel_setup {jogmode} {
+  for {set idx 0} {$idx < 4} {incr idx} {
+    set ::XHC_HB04_CONFIG(accel,$idx) 1.0 ;# default if unspecified
+  }
   if [info exists ::XHC_HB04_CONFIG(mpg_accels)] {
     set idx 0
     foreach g $::XHC_HB04_CONFIG(mpg_accels) {
@@ -132,7 +135,7 @@ proc wheel_setup {jogmode} {
          set g [expr -1 * $g]
          puts stderr "$::progname: mpg_accel #$idx must be positive was:$g1, is:$g"
       }
-      set ::XHC_HB04_CONFIG(accel,$idx) $g
+      set ::XHC_HB04_CONFIG(accel,$idx) [format %f $g] ;# ensure floatingpt
       incr idx
     }
   }
@@ -193,12 +196,6 @@ proc wheel_setup {jogmode} {
   makenet pendant:wheel-counts     <= xhc-hb04.jog.counts
   makenet pendant:wheel-counts-neg <= xhc-hb04.jog.counts-neg
 
-  makenet pendant:is-manual <= halui.mode.is-manual
-  makenet pendant:is-manual => pendant_util.is-manual
-
-  makenet pendant:jogenable-off <= xhc-hb04.jog.enable-off
-  makenet pendant:jogenable-off => pendant_util.jogenable-off
-
   set anames        {x y z a}
   set available_idx {0 1 2 3}
   # The pendant has fixed labels and displays for letters: x y z a
@@ -249,45 +246,40 @@ proc wheel_setup {jogmode} {
     setp pendant_util.scale$idx [expr $kvalue * $::XHC_HB04_CONFIG(scale,$idx)]
 
     set acoord [lindex $anames $idx]
-    makenet pendant:pos-$coord <= halui.axis.$coord.pos-feedback \
-                           => xhc-hb04.$acoord.pos-absolute
-    makenet pendant:pos-rel-$coord <= halui.axis.$coord.pos-relative \
-                               => xhc-hb04.$acoord.pos-relative
+    # accommodate existing signames for halui outpins:
+    makenet [existing_outpin_signame halui.axis.$coord.pos-feedback pendant:pos-$coord] \
+                                  <= halui.axis.$coord.pos-feedback \
+                                  => xhc-hb04.$acoord.pos-absolute
+
+    makenet [existing_outpin_signame halui.axis.$coord.pos-relative pendant:pos-rel-$coord] \
+                                  <= halui.axis.$coord.pos-relative \
+                                  => xhc-hb04.$acoord.pos-relative
 
     makenet pendant:jog-scale => axis.$coord.jog-scale
 
     makenet pendant:wheel-counts                 => pendant_util.in$idx
     makenet pendant:wheel-counts-$coord-filtered <= pendant_util.out$idx \
-                                             => axis.$coord.jog-counts
+                                                 => axis.$coord.jog-counts
 
-    #-----------------------------------------------------------------------
-    # multiplexer for ini.N.max_acceleration, ini.L.max_acceleration
+
     set COORD [string toupper $coord]
-    if [catch {set std_accel [set ::AXIS_[set COORD](MAX_ACCELERATION)]} msg] {
-      err_exit "Error: missing \[AXIS_[set COORD]\]MAX_ACCELERATION"
-    }
-    setp pendant_util.amux$idx-in0 $std_accel
-    if ![info exists ::XHC_HB04_CONFIG(accel,$idx)] {
-      set ::XHC_HB04_CONFIG(accel,$idx) $std_accel ;# if not specified
-    }
-    setp pendant_util.amux$idx-in1 $::XHC_HB04_CONFIG(accel,$idx)
-
-    # This signal is named using $coord so the connection can be made
-    # later when the ini pins have been created
-    makenet pendant:muxed-accel-$coord <= pendant_util.amux$idx-out
-    # a script running after task is started must connect:
-    # makenet pendant:muxed-accel-$coord => ini.$coord.max_acceleration
-    # and, if applicable
-    # makenet pendant:muxed-accel-$coord => ini.$jnum.max_acceleration
-
-    #-----------------------------------------------------------------------
     makenet pendant:jog-$coord <= xhc-hb04.jog.enable-$acoord \
-                           => axis.$coord.jog-enable
+                               => axis.$coord.jog-enable
     switch $jogmode {
       vnormal {
         setp axis.$coord.jog-vel-mode 1
       }
     }
+
+    set afraction 1.0 ;# default
+    if [catch {
+      set afraction [expr  $::XHC_HB04_CONFIG(accel,$idx)\
+                          /[set ::AXIS_[set COORD](MAX_ACCELERATION)] ]
+              } msg] {
+      err_exit "<$msg>\n\nMissing ini setting: \[AXIS_$COORD\]MAX_ACCELERATION"
+    }
+    setp axis.$coord.jog-accel-fraction $afraction
+
     # connect for joint pins if known (trivkins)
     if $has_jnum {
       if ![pin_exists joint.$jnum.jog-scale] {
@@ -306,6 +298,16 @@ proc wheel_setup {jogmode} {
         puts stderr "  \[AXIS_[set COORD]\]MAX_ACCELERATION=[set ::AXIS_[set COORD](MAX_ACCELERATION)]"
       }
       makenet pendant:jog-$coord => joint.$jnum.jog-enable
+
+      set jfraction 1.0 ;# default
+      if [catch {
+        set jfraction [expr  $::XHC_HB04_CONFIG(accel,$idx)\
+                            /[set ::JOINT_[set jnum](MAX_ACCELERATION)] ]
+                } msg] {
+        err_exit "<$msg>\n\nMissing ini setting: \[JOINT_$jnum\]MAX_ACCELERATION"
+      }
+      setp joint.$jnum.jog-accel-fraction $jfraction
+
       switch $jogmode {
         vnormal {
           setp joint.$jnum.jog-vel-mode 1
@@ -318,33 +320,40 @@ proc wheel_setup {jogmode} {
     puts "\n$::progname:\n$mapmsg"
   }
 
-  makenet pendant:jog-speed <= halui.max-velocity.value
-
   setp halui.feed-override.scale 0.01
   makenet pendant:wheel-counts  => halui.feed-override.counts
 
-  setp halui.spindle-override.scale 0.01
-  makenet pendant:wheel-counts  => halui.spindle-override.counts
+  setp halui.spindle.0.override.scale 0.01
+  makenet pendant:wheel-counts  => halui.spindle.0.override.counts
 
   makenet pendant:feed-override-enable => halui.feed-override.count-enable \
-                                   <= xhc-hb04.jog.enable-feed-override
+                                       <= xhc-hb04.jog.enable-feed-override
 
-  makenet pendant:feed-override <= halui.feed-override.value \
-                            => xhc-hb04.feed-override
+  makenet pendant:spindle-override-enable => halui.spindle.0.override.count-enable \
+                                          <= xhc-hb04.jog.enable-spindle-override
 
-  makenet pendant:feed-value <= motion.current-vel \
-                         => xhc-hb04.feed-value
 
-  makenet pendant:spindle-override-enable => halui.spindle-override.count-enable \
-                                      <= xhc-hb04.jog.enable-spindle-override
+  # accommodate existing signames for motion outpins
+  makenet [existing_outpin_signame   motion.current-vel pendant:feed-value] \
+                                  <= motion.current-vel \
+                                  => xhc-hb04.feed-value
 
-  makenet pendant:spindle-override <= halui.spindle-override.value \
-                               => xhc-hb04.spindle-override
+  makenet [existing_outpin_signame spindle.0.speed-out-rps-abs pendant:spindle-rps] \
+                                <= spindle.0.speed-out-rps-abs \
+                                => xhc-hb04.spindle-rps
 
-  set sname [existing_outpin_signame \
-                motion.spindle-speed-out-rps-abs pendant:spindle-rps]
-  makenet $sname <= motion.spindle-speed-out-rps-abs \
-             => xhc-hb04.spindle-rps
+  # accommodate existing signames for halui outpins:
+  makenet [existing_outpin_signame   halui.max-velocity.value pendant:jog-speed] \
+                                  <= halui.max-velocity.value
+
+  makenet [existing_outpin_signame   halui.feed-overide.value pendant:feed-override] \
+                                  <= halui.feed-override.value \
+                                  => xhc-hb04.feed-override
+
+  makenet [existing_outpin_signame   halui.spindle.0.override.value pendant:spindle-override] \
+                                  <= halui.spindle.0.override.value \
+                                  => xhc-hb04.spindle-override
+
 } ;# wheel_setup
 
 proc existing_outpin_signame {pinname newsigname} {
@@ -363,23 +372,29 @@ proc existing_outpin_signame {pinname newsigname} {
 
 proc std_start_pause_button {} {
   # hardcoded setup for button-start-pause
-  makenet    pendant:start-or-pause <= xhc-hb04.button-start-pause \
-                                => pendant_util.start-or-pause
+  makenet pendant:start-or-pause  <= xhc-hb04.button-start-pause \
+                                  => pendant_util.start-or-pause
 
-  makenet    pendant:is-idle    <= halui.program.is-idle \
-                            => pendant_util.is-idle
-  makenet    pendant:is-paused  <= halui.program.is-paused \
-                            => pendant_util.is-paused
-  makenet    pendant:is-running <= halui.program.is-running \
-                            => pendant_util.is-running
+  makenet pendant:program-resume  <= pendant_util.resume \
+                                  => halui.program.resume
+  makenet pendant:program-pause   <= pendant_util.pause \
+                                  => halui.program.pause
+  makenet pendant:program-run     <= pendant_util.run  \
+                                  => halui.program.run \
+                                  => halui.mode.auto
 
-  makenet    pendant:program-resume <= pendant_util.resume \
-                                => halui.program.resume
-  makenet    pendant:program-pause  <= pendant_util.pause \
-                                => halui.program.pause
-  makenet    pendant:program-run    <= pendant_util.run  \
-                                => halui.program.run \
-                                => halui.mode.auto
+  # accommodate existing signames for halui outpins:
+  makenet [existing_outpin_signame   halui.program.is-idle pendant:is-idle] \
+                                  <= halui.program.is-idle \
+                                  => pendant_util.is-idle
+
+  makenet [existing_outpin_signame   halui.program.is-paused pendant:is-paused] \
+                                  <= halui.program.is-paused \
+                                  => pendant_util.is-paused
+
+  makenet [existing_outpin_signame   halui.program.is-running pendant:is-running] \
+                                  <= halui.program.is-running \
+                                  => pendant_util.is-running
 } ;# std_start_pause_button
 
 proc popup_msg {msg} {

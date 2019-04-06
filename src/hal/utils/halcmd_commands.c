@@ -22,7 +22,7 @@
  *
  *  You should have received a copy of the GNU General Public
  *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111 USA
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  *  THE AUTHORS OF THIS LIBRARY ACCEPT ABSOLUTELY NO LIABILITY FOR
  *  ANY HARM OR LOSS RESULTING FROM ITS USE.  IT IS _EXTREMELY_ UNWISE
@@ -184,7 +184,7 @@ int do_linkpp_cmd(char *first_pin_name, char *second_pin_name)
     rtapi_mutex_give(&(hal_data->mutex));
     
     /* check that both pins have the same type, 
-       don't want to create a sig, which after that won't be usefull */
+       don't want to create a sig, which after that won't be useful */
     if (first_pin->type != second_pin->type) {
 	halcmd_error("pins '%s' and '%s' not of the same type\n",
                 first_pin_name, second_pin_name);
@@ -1569,8 +1569,8 @@ int do_waitusr_cmd(char *comp_name)
     comp = halpr_find_comp_by_name(comp_name);
     if (comp == NULL) {
 	rtapi_mutex_give(&(hal_data->mutex));
-	halcmd_error("component '%s' not found\n", comp_name);
-	return -EINVAL;
+	halcmd_info("component '%s' not found or already exited\n", comp_name);
+	return 0;
     }
     if (comp->type != 0) {
 	rtapi_mutex_give(&(hal_data->mutex));

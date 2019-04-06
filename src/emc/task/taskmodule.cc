@@ -14,10 +14,11 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with this program; if not, write to the Free Software
- *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 // TODO: reuse interp converters
 
+#define BOOST_PYTHON_MAX_ARITY 7
 #include <boost/python/class.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/implicit.hpp>
@@ -168,6 +169,7 @@ struct TaskWrap : public Task, public bp::wrapper<Task> {
 };
 
 typedef pp::array_1_t< EMC_AXIS_STAT, EMCMOT_MAX_AXIS> axis_array, (*axis_w)( EMC_MOTION_STAT &m );
+typedef pp::array_1_t< EMC_SPINDLE_STAT, EMCMOT_MAX_SPINDLES> spindle_array, (*spindle_w)( EMC_MOTION_STAT &m );
 typedef pp::array_1_t< int, EMCMOT_MAX_DIO> synch_dio_array, (*synch_dio_w)( EMC_MOTION_STAT &m );
 typedef pp::array_1_t< double, EMCMOT_MAX_AIO> analog_io_array, (*analog_io_w)( EMC_MOTION_STAT &m );
 
@@ -183,6 +185,10 @@ static  tool_array tool_wrapper ( EMC_TOOL_STAT & t) {
 
 static  axis_array axis_wrapper ( EMC_MOTION_STAT & m) {
     return axis_array(m.axis);
+}
+
+static  spindle_array spindle_wrapper ( EMC_MOTION_STAT & m) {
+    return spindle_array(m.spindle);
 }
 
 static  synch_dio_array synch_di_wrapper ( EMC_MOTION_STAT & m) {
@@ -254,15 +260,15 @@ BOOST_PYTHON_MODULE(emctask) {
     def("operator_error",
 	operator_error,
 	operator_error_overloads ( args("id"),
-				   "send an error messsage to the operator screen with an optional message id"  ));
+				   "send an error message to the operator screen with an optional message id"  ));
     def("operator_text",
 	operator_text,
 	operator_text_overloads ( args("id"),
-				   "send a informational messsage to the operator screen"  ));
+				   "send a informational message to the operator screen"  ));
     def("operator_display",
 	operator_display,
 	operator_display_overloads ( args("id"),
-				   "send a messsage to the operator display"  ));
+				   "send a message to the operator display"  ));
 
 
 #define VAL(X)  .value(#X, X)
@@ -324,6 +330,8 @@ BOOST_PYTHON_MODULE(emctask) {
 	.def_readonly("tooltable_filename", &Task::tooltable_filename)
 	;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     class_ <EMC_TRAJ_STAT, noncopyable>("EMC_TRAJ_STAT",no_init)
 	.def_readwrite("linearUnits", &EMC_TRAJ_STAT::linearUnits )
 	.def_readwrite("angularUnits", &EMC_TRAJ_STAT::angularUnits )
@@ -339,7 +347,6 @@ BOOST_PYTHON_MODULE(emctask) {
 	.def_readwrite("id", &EMC_TRAJ_STAT::id )
 	.def_readwrite("paused", &EMC_TRAJ_STAT::paused )
 	.def_readwrite("scale", &EMC_TRAJ_STAT::scale )
-	.def_readwrite("spindle_scale", &EMC_TRAJ_STAT::spindle_scale )
 	.def_readwrite("position", &EMC_TRAJ_STAT::position )
 	.def_readwrite("actualPosition", &EMC_TRAJ_STAT::actualPosition )
 	.def_readwrite("velocity", &EMC_TRAJ_STAT::velocity )
@@ -356,11 +363,10 @@ BOOST_PYTHON_MODULE(emctask) {
 	.def_readwrite("dtg", &EMC_TRAJ_STAT::dtg )
 	.def_readwrite("current_vel", &EMC_TRAJ_STAT::current_vel )
 	.def_readwrite("feed_override_enabled", &EMC_TRAJ_STAT::feed_override_enabled )
-	.def_readwrite("spindle_override_enabled", &EMC_TRAJ_STAT::spindle_override_enabled )
 	.def_readwrite("adaptive_feed_enabled", &EMC_TRAJ_STAT::adaptive_feed_enabled )
 	.def_readwrite("feed_hold_enabled", &EMC_TRAJ_STAT::feed_hold_enabled )
 	;
-
+#pragma GCC diagnostic pop
     class_ <EMC_JOINT_STAT, noncopyable>("EMC_JOINT_STAT",no_init)
 	.def_readwrite("units", &EMC_JOINT_STAT::units)
 	.def_readwrite("backlash", &EMC_JOINT_STAT::backlash)
@@ -391,6 +397,10 @@ BOOST_PYTHON_MODULE(emctask) {
 	.def_readwrite("brake", &EMC_SPINDLE_STAT::brake )
 	.def_readwrite("increasing", &EMC_SPINDLE_STAT::increasing )
 	.def_readwrite("enabled", &EMC_SPINDLE_STAT::enabled )
+	.def_readwrite("spindle_override_enabled", &EMC_SPINDLE_STAT::spindle_override_enabled )
+	.def_readwrite("spindle_scale", &EMC_SPINDLE_STAT::spindle_scale )
+	.def_readwrite("spindle_orient_state", &EMC_SPINDLE_STAT::orient_state )
+	.def_readwrite("spindle_orient_fault", &EMC_SPINDLE_STAT::orient_fault )
 	;
 
     class_ <EMC_COOLANT_STAT , noncopyable>("EMC_COOLANT_STAT ",no_init)
@@ -408,9 +418,9 @@ BOOST_PYTHON_MODULE(emctask) {
 	.add_property( "axis",
 		       bp::make_function( axis_w(&axis_wrapper),
 					  bp::with_custodian_and_ward_postcall< 0, 1 >()))
-
-
-	.def_readwrite("spindle", &emcStatus->motion.spindle)
+	.add_property( "spindle",
+			   bp::make_function( spindle_w(&spindle_wrapper),
+					  bp::with_custodian_and_ward_postcall< 0, 1 >()))
 	.add_property( "synch_di",
 		       bp::make_function( synch_dio_w(&synch_di_wrapper),
 					  bp::with_custodian_and_ward_postcall< 0, 1 >()))

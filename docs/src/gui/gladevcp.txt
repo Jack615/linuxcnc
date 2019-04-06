@@ -111,7 +111,7 @@ start Axis in the background and start gladevcp as follows:
 FIXME: I'm not sure how this is supposed to work with axis in one
 directory and gladevcp in a different directory.
 
-FIXME: there is a conflict for motion.spindle-speed-out since it is used by both
+FIXME: there is a conflict for motion.N.spindle-speed-out since it is used by both
    axis.ini: sim_spindle_encoder.hal
    and
    manual-example.ui: manual-example.hal
@@ -994,9 +994,18 @@ text_template::
 These containers are meant to be used to sensitize (grey out) or hide their children. +
 Insensitived children will not respond to input. +
 HAL_HideTable has one HAL BIT input pin which controls if it's child widgets are hidden or not. +
-If the pin is low then child widgets are visible which is the default state. +
+
+<Panel_basename>.<widgetname>::
+
+If the pin is low then child widgets are visible which is the default state.
+
 HAL_Table and HAL_Hbox have one HAL BIT input pin which controls if their child widgets are sensitive or not. +
-If the pin is low then child widgets are inactive which is the default state. +
+These widgets's pin name uses the convention: +
+
+<Panel_basename>.<widgetname>::
+
+If the pin is low then child widgets are inactive which is the default state.
+
 State_Sensitive_table responds to the state to linuxcnc's interpreter. +
 optionally selectable to respond to 'must-be-all-homed','must-be-on' and 'must-be-idle' +
 You can combine them. It will always be insensitive at Estop. +
@@ -1903,6 +1912,27 @@ This is for displaying and entering MDI codes. +
 It will automatically gray out when MDI is not available. +
 Eg during Estop and program running.
 
+font_size_tree::
+    a integer value between 8 and 96+
+    will modify the default font size of the treeview +
+    to the selected value +
+font_size_entry::
+    a integer value between 8 and 96+
+    will modify the default font size of the entry +
+    to the selected value +
+use_double_click::
+    True or False, setting this to True will enable the mouse double click +
+    feature and a double click on an entry will submit that command +
+    It is not recommended to use this feature on real machines, as a double +
+    click on a wrong entry may cause dangerous situations
+
+Using goobject to set the above listed properties::
+
+    Using goobject to set the listed properties:
+    [widget name].set_property("font_size_tree", 10)
+    [widget name].set_property("font_size_entry", 20)
+    [widget name].set_property("use_double_click", False)
+
 === Animated function diagrams: HAL widgets in a bitmap
 
 For some applications it might be desirable to have background image -
@@ -2773,3 +2803,57 @@ arise. For details, see the `keyboard_forward()` function in
 
 The LinuxCNC Wiki has information on adding custom widgets to GladeVCP.
 link:http://wiki.linuxcnc.org/cgi-bin/wiki.pl?GladeVCP_Custom_Widgets[GladeVCP Custom Widgets]
+
+== Auxiliary Gladevcp Applications
+
+Support is provided for independently installed gladevcp applications
+that conform to system directory placements as defined by the
+LINUXCNC_AUX_GLADEVCP and LINUXCNC_AUX_EXAMPLES items reported by
+the script linuxcnc_var:
+
+====
+  $ linuxcnc_var LINUXCNC_AUX_GLADEVCP
+  /usr/share/linuxcnc/aux_gladevcp
+  $ linuxcnc_var LINUXCNC_AUX_EXAMPLES
+  /usr/share/linuxcnc/aux_examples
+====
+
+The system directory defined by LINUXCNC_AUX_GLADEVCP
+(/usr/share/linuxcnc/aux_gladevcp) specifies the location for
+a gladevcp-compatible python file(s) and related subdirectories.
+The python file is imported at gladevcp startup and made
+available to subsequent gladevcp applications including 
+embedded usage in supporting guis.
+
+The system directory defined by LINUXCNC_AUX_EXAMPLES
+(/usr/share/linuxcnc/aux_examples) specifies the location
+of example configuration subdirectories used for auxiliary
+applications.  See the getting-started/running-linuxcnc
+section for 'Adding Configuration Selection Items'.
+
+For testing, a runtime specification of auxiliary applications
+may be specified using the exported environmental variable:
+GLADEVCP_EXTRAS.  This variable should be a path list of one or
+more configuration directories separated by a (:). Typically,
+this variable would be set in a shell starting linuxcnc or in
+a user’s ~/.profile startup script. Example:
+
+====
+  export GLADEVCP_EXTRAS=~/mygladevcp:/opt/othergladevcp
+====
+
+Files found in directories specified with the environmental
+variable GLADEVCP_EXTRAS supersede identically-named files within
+subdirectories of the system directory specified by
+LINUXNC_AUX_GLADEVCP (e.g., /usr/share/linuxcnc/aux_gladevcp).
+This provision allows a developer to test an application
+by exporting GLADEVCP_EXTRAS to specify a private application
+directory without removing a system-installed application directory.
+Messages inidicating rejected duplicates are printed to
+stdout.
+
+[NOTE]
+
+Support for auxiliary gladevcp applications requires a python
+module named 'importlib'.  This module may not be available in
+older installations like Ubuntu-Lucid.

@@ -1,3 +1,171 @@
+ver 2.3.5
+- jogging a not homed machine did change the button state of MDI and AUTO to be
+  sensitive, what is not correct.
+- it was not possible to jog a unhomed machine over the given limits, what is 
+  not a correct behavior.
+
+ver 2.3.4.2
+- introduced new keyboard shortcuts (not case sensitive)
+  R = run program
+  P = pause program
+  S = resume program
+  This keys will only work in auto mode, not being in edit mode and 
+  a program must be loaded. Pause and resume do only work if a 
+  program is running and / or paused.
+
+ver 2.3.4.1
+- Philippe mentioned that a change of the DRO Size on settings page will be
+  saved as expected, but after new start of the GUI, the value did note be
+  restored properly. I have corrected the behavior
+
+ver 2.3.4
+- Leon82 mentioned, that offset page did close after editing a column and leaving
+  the edited cell. This was caused due to a hidden mode change to MDI because
+  leaving the cell would apply the change using MDI commands from 
+  offset page_widget.py. Gmoccapy now checks the state of the "EDIT OFFSETS" 
+  toggle button and does not react to MDI Mode switch if that button is active.
+  at the same time, the mode buttons etc. are disabled!
+  
+  Same changes as with gmoccapy 1.5.11
+
+ver 2.3.3.4
+- a merge of 2.7 to master resulted in a call of a widget, that does not longer
+  exist in master (adj_max_velocity) causing an exception on halui pin changes.
+  Thanks to COlger81 and Chris Morley for reporting the bug
+
+ver 2.3.3.3
+- editing offsets, leaded to a error output in the console, due to missing
+  widget btn_zero_x
+
+ver 2.3.3.2
+- toggling the chk_toggle_readout, raised an exception on 5 axis config
+
+ver 2.3.3.1
+- small changes to the code, as there was a possibility the
+  label was shown, even if auto tool measurement was not used
+
+ver 2.3.3
+- added a label at the button of the preview window to show the actual 
+  block-height value
+- the value is stored in the preference file and will be reloaded on start up,
+  the corresponding hal pin is set to that value
+- the block-height label is only visible, if the "use auto tool measurement" 
+  check-box is active!
+
+  Thanks to Rubenv and crislacuf for reporting
+
+ver 2.3.2.4
+- most of .format code rework done
+
+ver 2.3.2.3
+- display message as dialog, when critical errors do avoid the start of gmoccapy
+  not only report in terminal
+
+ver 2.3.2.2
+- ongoing reformatting the code to new .format style
+
+ver 2.3.2.1
+- formating bug in Vc, when over 100, float can not be formated as int
+
+ver 2.3.2
+- added a new label to toolinfo box, showing the cutting speed Vc
+  it uses the tool diameter on mill and the x-relative value for lathe
+- first code updates to the new string formating (not % but .format),
+  as this will be needed to switch over to python 3
+
+ver 2.3.1.9
+- dialogs, changed entry_dialog check for integer before show_all
+  This was only a cosmetic change
+- Solved bug in lathe mode, changing the size of DRO, did not 
+  change the Y DRO (D). Thanks to Partic T for reporting
+
+ver 2.3.1.8
+- made dialogs a Class and enable gobject signals with the dialogs
+  Now a sound will be played if a dialog pops up.
+
+  This is a first step to modify all the handling within the GUI to
+  make most parts react to signal and slots.
+
+ver 2.3.1.7
+- minor bug in self periodic, forgot to change an AUDIO_AVIABLE setting
+- some work on tool handling, i.e. not possible to delete tool in spindle
+  any more and after applying changes the tool in spindle will be marked
+
+ver 2.3.1.6
+- solved the bug, that the decimal separator was changed after starting the gui
+  the was related to the import of gst, as this import does change the value of
+  locale.localeconv()["decimal_point"]
+  I do not know why, but the import of gst prior to locale settings solves the problem
+
+ver 2.3.1.5
+- some code clearance, as the tooleditor stuff was reparted on several places
+  Now it is together in _init_tooleditor.
+  This is the begining of finding the bug of decimal separator handling
+  Push reload will replace the German "," with the "." Why = ?????
+
+ver 2.3.1.4
+- if no sound is available make the sound selecting widgets on the settings page
+  not sensitive, Thanks to Rene for reporting this misbehavior
+
+ver 2.3.1.3
+- changed the import of the player module, as Stretch does not support gst in
+  the way Wheesy or Jessie did
+
+ver 2.3.1.2
+- rodw reported that gmoccapy reported a wrong error if JOINT was mentioned
+  in the error report. That was caused due to an old change from Joints to axis
+  in _show_errors.
+
+ver 2.3.1.1
+- added KeyPad Jogging as a wish from "suspension" from the forum
+
+ver 2.3.1
+- added a new hal pin for tool diameter
+
+ver 2.3.0
+- joint axis branch did change the handling between joints and axis. Previously
+  it was needed to include a unused Y axis for a lathe and now that is not longer
+  needed. There are some more changes, that needed some additional changes to
+  gmoccapy. I have passed a lot of code over to get_ini_info.
+- all config files have been changed to support the new behavior. I tried to make
+  all the code compatible with older configs. Some might need the not used axis
+  to be included in homing entries in the ini files.
+
+ver 2.2.5.2
+- if the GUI tries to reload a tool on restart and that tool was not found in 
+  the tool table, the GUI remained in MDI mode, while it was showing the manual 
+  view. This leaded to the problem, that jogging was not possible, but users 
+  thought they where in MANUAL mode, where jogging should be allowed.
+
+ver 2.2.5.1
+- added a new dictionary self.joint_axis_dic to maintain the relation between 
+  joints and axis. This was tested with gantry and non identical configs. There
+  might be configs out there witch won't work with gmoccapy.
+  I found that the only way to get gantry XYYZ and i.e. XYZCW config to work
+  with the homing button and the DRO settings
+
+ver 2.2.5
+- this repairs the parts I broke on glade applications and the former used
+  code in CombiDRO moved in a similar mode to gmoccapy. Now after the merge of
+  sequential homing branch it is easier to use a gantry config with gmoccapy.
+  There is still need to adapt the "on_btn_homing_selected" part of the GUI, as
+  now a XYZC config will not allow homing of C, as the joints are not ordered
+  correctly
+
+ver 2.2.4
+- introduced a check for double axis letters in [TRAJ]COORDINATES = X Y Y Z 
+  to set the homing button of the double mentioned axis. This is to protect 
+  a gantry from being damaged homing only one joint of two.
+  Thanks to rodw for insisting to solve the misbehavior
+
+ver 2.2.3.3
+- check on homing for double letters and get the correct joint number
+  for homing
+
+ver 2.2.3.2
+- solved a bug caused due to an unappropriated merge of Sebastian Kuzminski
+  causing a hal pin to be created twice.
+
 ver 2.2.3.1
 - solved the reload tool on start up bug after homing twice
   if there is already a tool in spindle, the user 
@@ -267,6 +435,28 @@ ver. 2.0.1
 ver. 2.0.0
 - initial push of beta gmoccapy with 5 axis
 
+ver. 1.5.11
+- Leon82 mentioned, that offset page did close after editing a column and leaving
+  the edited cell. This was caused due to a hidden mode change to MDI because
+  leaving the cell would apply the change using MDI commands from 
+  offset page_widget.py. Gmoccapy now checks the state of the "EDIT OFFSETS" 
+  toggle button and does not react to MDI Mode switch if that button is active.
+  at the same time, the mode buttons etc. are disabled!
+
+ver. 1.5.10
+- fixed a misbehavior of the turtle button
+  If machine and system units was not identical, the turtle button destroyed
+  the values set on the jog vel slider
+  thanks to sliptonic from linuxcnc forum
+- while moving the max vel slider and units of machine and system not being 
+  identical, results in a jumping slider, as the factor has not been taken in 
+  account on the halui pin checking
+
+ver. 1.5.9
+- fixed a bug on import gst, leading to an exception if gst is not installed
+- fixed a bug, not taking care of Y-DRO (D) in lathe mode if the user changed
+  the size of the DRO
+
 ver. 1.6.0
 - changed the initial sound files to fit freedesktop path
   was set to ubuntu till now
@@ -278,6 +468,11 @@ ver. 1.6.0
 - ToDo: * Add widget to change motion mode
         * Init GUI to have a jog button per joint and not only per axis
         * change GUI appearance according to motion mode
+
+ver. 1.5.7
+- new hal pin gmoccapy.ignore-limits so that this function can be
+  handled from hardware switch
+  Ask by some users, done because of a wish of Timothy Snowden
 
 ver. 1.5.6.10
 - if no MARCO was found in INI getiniinfo returned a NONE, leading to an

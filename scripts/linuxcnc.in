@@ -50,6 +50,14 @@ LINUXCNC_TCL_LIB_DIR=@EMC2_TCL_LIB_DIR@
 HALLIB_DIR=@HALLIB_DIR@; export HALLIB_DIR
 HALLIB_PATH=.:$HALLIB_DIR; export HALLIB_PATH
 
+# put ~.local/bin in PATH if missing. See:
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=839155
+if [ -d $HOME/.local/bin ]; then
+    if [[ "$PATH" != *".local/bin"* ]]; then
+        PATH=$HOME/.local/bin:$PATH
+    fi
+fi
+
 #put the LINUXCNC_BIN_DIR in PATH
 PATH=$LINUXCNC_BIN_DIR:$PATH
 #ditto scripts if not RIP
@@ -429,12 +437,12 @@ function GetFromIniEx {
 
 # 2.1.5 check version
 GetFromIni VERSION EMC
-if [ "$retval" != "1.0" ]; then
+if [ "$retval" != "1.1" ]; then
     if [ -z "$DISPLAY" ]; then
         echo "ini file [EMC]VERSION indicates update is needed, but the update GUI can't run without an X display"
         exit 1
     fi
-    update_ini -d $INIFILE
+    update_ini -d "$INIFILE"
     exitval=$?
     case "$exitval" in
     0) ;;

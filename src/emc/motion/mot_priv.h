@@ -31,8 +31,51 @@
 #include "../motion/motion.h"
 
 typedef struct {
+    // creating a lot of pins for spindle control to be very flexible
+    // the user needs only a subset of these
+
+    // simplest way of spindle control (output start/stop)
+    hal_bit_t *spindle_on;  /* spindle spin output */
+
+    // same thing for 2 directions
+    hal_bit_t *spindle_forward; /* spindle spin-forward output */
+    hal_bit_t *spindle_reverse; /* spindle spin-reverse output */
+
+    // simple velocity control (as long as the output is active the spindle
+    //                          should accelerate/decelerate
+    hal_bit_t *spindle_incr_speed;  /* spindle spin-increase output */
+    hal_bit_t *spindle_decr_speed;  /* spindle spin-decrease output */
+
+    // simple output for brake
+    hal_bit_t *spindle_brake;   /* spindle brake output */
+
+    // output of a prescribed speed (to hook-up to a velocity controller)
+    hal_float_t *spindle_speed_out; /* spindle speed output */
+    hal_float_t *spindle_speed_out_rps; /* spindle speed output */
+    hal_float_t *spindle_speed_out_abs; /* spindle speed output absolute*/
+    hal_float_t *spindle_speed_out_rps_abs; /* spindle speed output absolute*/
+    hal_float_t *spindle_speed_cmd_rps; /* spindle speed command without SO applied */
+    hal_float_t *spindle_speed_in;  /* spindle speed measured */
+    hal_bit_t *spindle_index_enable; /* spindle inde I/O pin */
+    hal_bit_t *spindle_inhibit;
+    hal_float_t *spindle_revs;
+    hal_bit_t *spindle_is_atspeed;
+    hal_bit_t *spindle_amp_fault;
+
+    // spindle orient
+    hal_float_t *spindle_orient_angle;  /* out: desired spindle angle, degrees */
+    hal_s32_t   *spindle_orient_mode;   /* out: 0: least travel; 1: cw; 2: ccw */
+    hal_bit_t   *spindle_orient;    /* out: signal orient in progress */
+    hal_bit_t   *spindle_locked;    /* out: signal orient complete, spindle locked */
+    hal_bit_t   *spindle_is_oriented;   /* in: orientation completed */
+    hal_s32_t   *spindle_orient_fault;  /* in: error code of failed operation */
+
+} spindle_hal_t;
+
+typedef struct {
     hal_float_t *coarse_pos_cmd;/* RPI: commanded position, w/o comp */
     hal_float_t *joint_vel_cmd;	/* RPI: commanded velocity, w/o comp */
+    hal_float_t *joint_acc_cmd;	/* RPI: commanded acceleration, w/o comp */
     hal_float_t *backlash_corr;	/* RPI: correction for backlash */
     hal_float_t *backlash_filt;	/* RPI: filtered backlash correction */
     hal_float_t *backlash_vel;	/* RPI: backlash speed variable */
@@ -74,13 +117,14 @@ typedef struct {
     hal_s32_t   *jjog_counts;	/* WPI: jogwheel position input */
     hal_bit_t   *jjog_enable;	/* RPI: enable jogwheel */
     hal_float_t *jjog_scale;	/* RPI: distance to jog on each count */
+    hal_float_t *jjog_accel_fraction;	/* RPI: to limit wheel jog accel */
     hal_bit_t   *jjog_vel_mode;	/* RPI: true for "velocity mode" jogwheel */
 
 } joint_hal_t;
 
 typedef struct {
     hal_float_t *pos_cmd;        /* RPI: commanded position */
-    hal_float_t *vel_cmd;        /* RPI: commanded velocity */
+    hal_float_t *teleop_vel_cmd; /* RPI: commanded velocity */
     hal_float_t *teleop_pos_cmd; /* RPI: teleop traj planner pos cmd */
     hal_float_t *teleop_vel_lim; /* RPI: teleop traj planner vel limit */
     hal_bit_t   *teleop_tp_enable; /* RPI: teleop traj planner is running */
@@ -88,9 +132,17 @@ typedef struct {
     hal_s32_t   *ajog_counts;	/* WPI: jogwheel position input */
     hal_bit_t   *ajog_enable;	/* RPI: enable jogwheel */
     hal_float_t *ajog_scale;	/* RPI: distance to jog on each count */
+    hal_float_t *ajog_accel_fraction;	/* RPI: to limit wheel jog accel */
     hal_bit_t   *ajog_vel_mode;	/* RPI: true for "velocity mode" jogwheel */
     hal_bit_t   *kb_ajog_active;   /* RPI: executing keyboard jog */
     hal_bit_t   *wheel_ajog_active;/* RPI: executing handwheel jog */
+
+    hal_bit_t   *eoffset_enable;
+    hal_bit_t   *eoffset_clear;
+    hal_s32_t   *eoffset_counts;
+    hal_float_t *eoffset_scale;
+    hal_float_t *external_offset;
+    hal_float_t *external_offset_requested;
 } axis_hal_t;
 
 /* machine data */
@@ -98,13 +150,10 @@ typedef struct {
 typedef struct {
     hal_bit_t *probe_input;	/* RPI: probe switch input */
     hal_bit_t *enable;		/* RPI: motion inhibit input */
-    hal_bit_t *spindle_index_enable;
-    hal_bit_t *spindle_is_atspeed;
-    hal_float_t *spindle_revs;
-    hal_bit_t *spindle_inhibit;	/* RPI: set TRUE to stop spindle (non maskable)*/
     hal_float_t *adaptive_feed;	/* RPI: adaptive feedrate, 0.0 to 1.0 */
     hal_bit_t *feed_hold;	/* RPI: set TRUE to stop motion maskable with g53 P1*/
     hal_bit_t *feed_inhibit;	/* RPI: set TRUE to stop motion (non maskable)*/
+    hal_bit_t *homing_inhibit;	/* RPI: set TRUE to inhibit homing*/
     hal_bit_t *motion_enabled;	/* RPI: motion enable for all joints */
     hal_bit_t *in_position;	/* RPI: all joints are in position */
     hal_bit_t *coord_mode;	/* RPA: TRUE if coord, FALSE if free */
@@ -132,41 +181,6 @@ typedef struct {
     hal_float_t *analog_input[EMCMOT_MAX_AIO]; /* RPI array: input pins for analog Inputs */
     hal_float_t *analog_output[EMCMOT_MAX_AIO]; /* RPI array: output pins for analog Inputs */
 
-
-    // creating a lot of pins for spindle control to be very flexible
-    // the user needs only a subset of these
-
-    // simplest way of spindle control (output start/stop)
-    hal_bit_t *spindle_on;	/* spindle spin output */
-
-    // same thing for 2 directions
-    hal_bit_t *spindle_forward;	/* spindle spin-forward output */
-    hal_bit_t *spindle_reverse;	/* spindle spin-reverse output */
-
-    // simple velocity control (as long as the output is active the spindle
-    //                          should accelerate/decelerate
-    hal_bit_t *spindle_incr_speed;	/* spindle spin-increase output */
-    hal_bit_t *spindle_decr_speed;	/* spindle spin-decrease output */
-
-    // simple output for brake
-    hal_bit_t *spindle_brake;	/* spindle brake output */
-
-    // output of a prescribed speed (to hook-up to a velocity controller)
-    hal_float_t *spindle_speed_out;	/* spindle speed output */
-    hal_float_t *spindle_speed_out_rps;	/* spindle speed output */
-    hal_float_t *spindle_speed_out_abs;	/* spindle speed output absolute*/
-    hal_float_t *spindle_speed_out_rps_abs;	/* spindle speed output absolute*/
-    hal_float_t *spindle_speed_cmd_rps;	/* spindle speed command without SO applied */
-    hal_float_t *spindle_speed_in;	/* spindle speed measured */
-    
-    // spindle orient
-    hal_float_t *spindle_orient_angle;	/* out: desired spindle angle, degrees */
-    hal_s32_t   *spindle_orient_mode;	/* out: 0: least travel; 1: cw; 2: ccw */
-    hal_bit_t   *spindle_orient;	/* out: signal orient in progress */
-    hal_bit_t   *spindle_locked;	/* out: signal orient complete, spindle locked */
-    hal_bit_t   *spindle_is_oriented;	/* in: orientation completed */
-    hal_s32_t   *spindle_orient_fault;	/* in: error code of failed operation */
-
     // FIXME - debug only, remove later
     hal_float_t traj_pos_out;	/* RPA: traj internals, for debugging */
     hal_float_t traj_vel_out;	/* RPA: traj internals, for debugging */
@@ -189,9 +203,12 @@ typedef struct {
     hal_float_t *tooloffset_v;
     hal_float_t *tooloffset_w;
 
+    spindle_hal_t spindle[EMCMOT_MAX_SPINDLES];     /*spindle data */
     joint_hal_t joint[EMCMOT_MAX_JOINTS];	/* data for each joint */
     axis_hal_t axis[EMCMOT_MAX_AXIS];	        /* data for each axis */
 
+    hal_bit_t   *eoffset_active; /* ext offsets active */
+    hal_bit_t   *eoffset_limited; /* ext offsets exceed limit */
 } emcmot_hal_data_t;
 
 /***********************************************************************
@@ -264,6 +281,9 @@ extern void clearHomes(int joint_num);
 
 extern void emcmot_config_change(void);
 extern void reportError(const char *fmt, ...) __attribute((format(printf,1,2))); /* Use the rtapi_print call */
+
+int joint_is_lockable(int joint_num);
+
 
  /* rtapi_get_time() returns a nanosecond value. In time, we should use a u64
     value for all calcs and only do the conversion to seconds when it is
@@ -347,4 +367,6 @@ extern void reportError(const char *fmt, ...) __attribute((format(printf,1,2)));
 #if defined(__KERNEL__)
 #define HAVE_CPU_KHZ
 #endif
+
+#define EOFFSET_EPSILON  1e-8
 #endif /* MOT_PRIV_H */

@@ -89,7 +89,7 @@ or Ubuntu Lucid.
 | Ubuntu Lucid   | `deb http://linuxcnc.org lucid base 2.7-rtai`
 |====
 
-image::images/upgrading-to-2.7.png[align="left"]
+image::images/upgrading-to-2.7.png[align="left", alt="Setting apt sources"]
 
 * Click `Add Source`, then `Close` in the Software Sources window.
   If it pops up a window informing you that the information about
@@ -214,6 +214,25 @@ configurations include:
 
 The following subsections and the section for 'Hal Changes' list items that
 may require additional user edits to ini or hal files.
+
+=== Multiple Spindle Support
+
+LinuxCNC now supports up to 8 spindles (and can be recompiled for more)
+Existing G-code will run without modification and most configurations
+will default to single spindles. To add spindles both the "num_spindles"
+modparam to the motion module in the HAL file and the [TRAJ]SPINDLES
+entry in the INI file should be changed/added to choose the required
+number. These /must/ match. 
+The spindle control pin names have been changed to make spindles look
+more like axes and joints. motion.spindle-speed-out is now spindle.0.speed-out
+for example. The automatic update script will take care of these changes.
+To control extra spindles the G and M-codes which control spindle speed
+now accept an additional "$" argument, for example M3 $2 to start the
+third spindle. "$" was chosen to avoid clashes with any existing code
+letters. It should be possible to create custom G-codes to match any
+other multi-spindle controller. 
+See the G-code and M-code manuals for code changes, and man motion for
+the HAL pin changes. 
 
 === TRAJ velocities, accelerations names
  
@@ -390,11 +409,12 @@ Note: Custom kinematics modules that implement non-identity kinematics (like
 
 === Home sequences
 
-Negative values may be used for the ini file items
+*Negative* values may be used for the ini file items
 named [JOINT_n]HOME_SEQUENCE.  Prior to joints_axes incorporation a value
 of -1 or the ommission of the item indicated no sequence was applicable.
 Now, only omission of the item is used for that purpose.
-
+See the chapter: <<cha:homing-configuration, 'Homing Configuration'>> 
+for more information.
 
 === Locking rotary indexer (updates for joints_axes)
 
@@ -571,6 +591,16 @@ Note: In prior versions of LinuxCNC (before joints_axes updates), the
 
 == Hal Changes (Other)
 
+=== halcompile
+
+The number of names= instances was formerly limited to 16.  Now,
+for realtime components (loadrt) the instances are assigned
+dynamically with no built-in limit.  The limit of 16 still
+applies to names= items for userspace (loadusr) components.
+
+For components using 'personality', the maximum number is now
+settable by a command line option -P|--personalities.
+
 === Parameter to Pin changes
 
 The following hal output pins were changed from parameters to pins
@@ -581,7 +611,103 @@ so that they can be connected to signals:
    motion.servo.last-period_ns (kernel-dependent availability)
 ----
 
+== Interface changes for joints_axes
+
+=== python linuxcnc module
+
+The jog() interface includes a 'joint-flag' to specify joint (True)
+or teleop (False) jogging:
+
+----
+jog(command, joint-flag, axis-or-joint-number, velocity[, distance]])
+
+jog(linuxcnc.JOG_STOP, joint-flag, axis-or-joint-number)
+jog(linuxcnc.JOG_CONTINUOUS, joint-flag, joint-flag, velocity)
+jog(linuxcnc.JOG_INCREMENT, joint-flag, axis-or-joint-number, velocity, distance)
+----
+
 == GUIs (updates for joints_axes)
+
+=== Notes on joint/axis jogging, homing, and kinematics
+
+With incorporation of joints_axes updates, LinuxCNC enforces the
+distinctions of joints and axes (coordinate letters) -- but some
+guis (like the axis gui) may hide some of the distinctions for
+simple machines.
+
+In most cases, you can think of joints as 'motors'.
+
+The relationships between joints and axis coordinates are
+determined by the mathmatical kinematics functions that describe a
+machine's motion.
+
+World coordinates (X,Y,Z,A,B,C,U,V,W) are determined by applying
+'FORWARD' kinematics operations to joint (motor) positions.
+
+When moving in world space (e.g., gcode movements) the required
+joint (motor) positions are determined by applying 'INVERSE'
+kinematics operations to the coordinates requested for motion
+in world space.
+
+Moving in world space is possible only 'after' homing.
+
+For simple machines (like mills and lathes) there is a one-to-one
+equivalence of joints and axis coordinate letters.  For example,
+on an XYZ mill, the relationships are typically: axisX==joint0,
+axisY==joint1, axisZ=joint2.  This correspondence is
+characterized as 'IDENTITY' kinematics  and the kinematics module
+used is usually trivkins (trivial kinematics).  (See the trivkins
+man page '$ man trivkins')
+
+Joint jogging (by joint number 0,1,...) is used in joint mode
+(usually used only 'BEFORE' homing).  When homing is completed,
+the jogging mode is 'AUTOMATICALLY' switched from joint mode to
+world mode and axis jogging (coordinate letter X,Y,...) is used.
+This is appropriate for all gcode moves requested by MDI commands
+or by gcode programs.
+
+Although jogging in joint mode is often never required after
+homing, some guis (like axis) provide a keyboard shortcut ('$')
+to allow toggling between joint and world (teleop) modes for
+machines that use 'non-IDENTITY' kinematics.
+
+In many common situations, joint jogging is never needed since
+homing is accomplished using home switches and/or the various homing
+methods provided by LinuxCNC.  One simply turns on
+the machine, issues the Home-All command, the machine homes and
+changes to world mode automatically. See
+<<cha:homing-configuration,Homing Configuration>>
+
+Machines that do not use home switches may require manual jogging
+in joint mode before homing each and every joint.  It is also
+possible to use immediate homing (see the homing docs) for joints
+that do not require homing to a fixed position.
+
+Although a gui may hide joints/axes distinctions for 'IDENTITY'
+kinematics machines, it is usually important to complete homing
+in order to run programs or use features provided by a gui.
+
+By default, the trivkins module declares itself as having
+'IDENTITY' kinematics.  The distinctions of joint/world
+operations can be made visible in the axis gui when using
+trivkins by setting the kinemetics type to a 'non-IDENTITY' type
+using 'kinstype=both'.   The 'both' setting indicates that both
+forward and inverse kinematics functions are available and gui
+provisions that hide the distinctions of joints and axis letters
+should not be employed.  For example, for an xyz configuration,
+specify:
+
+----
+[KINS]
+KINEMATICS = trivkins coordinates=xyz kinstype=both
+----
+
+With this setting, identity kinematics will be used but the axis
+gui will:
+
+. show joint numbers prior to homing
+. show axis letters after successful homing
+. support toggling between joint and teleop modes with the '$' key
 
 === Halui
 
@@ -706,6 +832,7 @@ These assignments can be controlled by new inifile directives in the
 Note that the parameters used for jogging may not be appropriate for both modes
 for machines with non-identity kinematics.
 
+
 === tklinuxcnc
 
 The tklinuxcnc gui supports both identity and non-identity kinematics, includes
@@ -771,6 +898,9 @@ ShuttleXpress, so the old driver name is no longer accurate.
 
 === linuxcncrsh
 
+"Home All" is now supported with the set home subcommand
+by using -1 for the joint number
+
 The jogging commands have been altered to accomodate both joint (free)
 and teleop (world) jogging.
 
@@ -831,7 +961,7 @@ purpose.
 
 === Post-joints_axes
 
-With the incorporation of joints_axes functionality, may sims provided
+With the incorporation of joints_axes functionality, many sims provided
 in the distribution now take advantage of a general purpose halfile that
 supports numerous configurations automatically.  A typical sim config
 HALFILE specification is:
@@ -938,5 +1068,81 @@ connections.
 The sim config 'Sample Configurations/sim/axis/minimal_xyz.ini'
 demonstrates a working xyz configuration that uses LIB:basic_sim.tcl
 with a minimal number of ini file settings.
+
+== Ongoing updates to development branch
+
+Commits to unreleased branches may make changes that affect testers
+and early-adopters of the unreleased software.
+
+=== Motion pins
+
+New pins (see the motion man page for more info):
+
+---
+axis.L.jog-accel-fraction
+joint.N.jog-accel-fraction
+---
+
+=== Hal pins
+
+Name changes:
+
+----
+was: axis.L.vel-cmd
+ is: axis.l.teleop-vel-cmd
+----
+
+New pins:
+
+----
+motion.homing-inhibit (see motion manpage)
+----
+
+=== Hal component updates
+
+. siggen: new pin 'reset' to set output signal values to predefined state
+. biquad: pins 'type,f0,Q,s1,s2' were formerly params
+
+=== XHC-HB04 Pendant Support
+
+==== xhc_hb04_util.comp (helper component)
+
+Remove unused pin 'jogenable-off'
+
+Add pin 'amux-enable' so that the multiplexed acceleration reductions are now
+enabled by the ANDing the pins: 'is-manual' and 'amux-enable'.  These two pins
+are  typically connected to 'halui.mode.is-manual' and 'halui.mode.is-teleop'
+respectively.
+
+==== xhc_hb04.tcl (optional LIB configuration halfile)
+
+Remove signal pendant:jogenable-off for removed pin 'pendant_util.jogenable-off'
+
+Support new motion pins for reduced accelerations
+(axis.L.jog-accel-fraction, joint.N.jog-accel-fraction) for wheel jogging.
+The use of [APPLICATIONS]APP=xhc-hb04-accels is no longer supported.
+Reduced accels are applied for wheel jogging only (not for nml commands
+issued by guis).
+
+=== [JOINT_n]HOME_SEQUENCE Starting values
+
+Starting sequence values may be 0, 1 (or -1) only.  See the
+"Homing Configuration" documentation for more information.
+
+=== [JOINT_n]HOME_SEQUENCE Negative values
+
+Joints using a negative HOME_SEQUENCE are not allowed to jog in joint
+mode in order to prevent misalignment (racking) in common gantry
+configurations.  As always, machines with any kinematics type must be
+homed prior to enabling conventional world mode jogging.
+
+=== TWOPASS support for complex loadrt config= items
+
+Added twopass support for loadrt config modparams with multiple
+settings separated by blanks and enclosed with quotes.  Example:
+
+----
+loadrt hm2_eth board_ip=10.10.10.10 config="num_encoders=2 num_pwmgens=2 num_stepgens=3"
+----
 
 // vim: set syntax=asciidoc:
